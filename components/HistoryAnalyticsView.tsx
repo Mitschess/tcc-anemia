@@ -11,46 +11,74 @@ interface HistoryAnalyticsProps {
   wearableLogs: WearableDataPoint[];
 }
 
+// SVG chart dimensions with internal padding so dots never clip
+const CHART_W = 600;
+const CHART_H = 220;
+const PAD_X = 8;
+const PAD_Y = 22; // top/bottom room for dots
+
 export const HistoryAnalyticsView: React.FC<HistoryAnalyticsProps> = ({
   user,
   menstrualLogs,
   wearableLogs,
 }) => {
   const [rangeDays, setRangeDays] = useState<number>(14);
+  const [tooltip, setTooltip] = useState<{ idx: number } | null>(null);
   const displayLogs = wearableLogs.slice(0, rangeDays).slice().reverse();
 
   const hrValues = displayLogs.map((l) => l.restingHR);
-  const maxHR = Math.max(...hrValues, user.baselineHR + 10, 80);
-  const minHR = Math.min(...hrValues, user.baselineHR - 8, 50);
+  const rawMax = Math.max(...hrValues, user.baselineHR + 10, 80);
+  const rawMin = Math.min(...hrValues, user.baselineHR - 8, 50);
+  // Add padding to data range so points never touch the edge
+  const dataRange = rawMax - rawMin || 1;
+  const maxHR = rawMax + dataRange * 0.15;
+  const minHR = rawMin - dataRange * 0.10;
 
-  // Compute normalized coordinates (0-100) for points
-  const points = displayLogs.map((log, idx) => {
-    const x = (idx / (displayLogs.length - 1 || 1)) * 100;
-    const y = 100 - ((log.restingHR - minHR) / (maxHR - minHR || 1)) * 100;
-    const isPeriod = menstrualLogs.find((m) => m.date === log.date)?.isPeriodDay;
-    return { x, y, log, isPeriod };
-  });
+  const plotW = CHART_W - PAD_X * 2;
+  const plotH = CHART_H - PAD_Y * 2;
 
-  // Generate smooth cubic bezier SVG path
-  const linePathD = points.reduce((acc, pt, i) => {
-    if (i === 0) return `M ${pt.x},${pt.y}`;
+  const toX = (idx: number) =>
+    PAD_X + (idx / (displayLogs.length - 1 || 1)) * plotW;
+  const toY = (hr: number) =>
+    PAD_Y + plotH - ((hr - minHR) / (maxHR - minHR)) * plotH;
+
+  const points = displayLogs.map((log, idx) => ({
+    x: toX(idx),
+    y: toY(log.restingHR),
+    log,
+    isPeriod: !!menstrualLogs.find((m) => m.date === log.date)?.isPeriodDay,
+  }));
+
+  // Smooth bezier path
+  const linePath = points.reduce((acc, pt, i) => {
+    if (i === 0) return `M ${pt.x} ${pt.y}`;
     const prev = points[i - 1];
-    const cx = (prev.x + pt.x) / 2;
-    return `${acc} C ${cx},${prev.y} ${cx},${pt.y} ${pt.x},${pt.y}`;
+    const cpx = (prev.x + pt.x) / 2;
+    return `${acc} C ${cpx} ${prev.y} ${cpx} ${pt.y} ${pt.x} ${pt.y}`;
   }, '');
 
-  // Generate closed area path for gradient fill under the line
-  const areaPathD = points.length > 0
-    ? `${linePathD} L ${points[points.length - 1].x},100 L ${points[0].x},100 Z`
-    : '';
+  const areaPath =
+    points.length > 1
+      ? `${linePath} L ${points[points.length - 1].x} ${PAD_Y + plotH} L ${points[0].x} ${PAD_Y + plotH} Z`
+      : '';
 
-  const yBase = 100 - ((user.baselineHR - minHR) / (maxHR - minHR || 1)) * 100;
+  const yBase = toY(user.baselineHR);
+
+  // Which point indices show an x-axis label (max 7)
+  const labelIndices = (() => {
+    const n = displayLogs.length;
+    if (n <= 7) return displayLogs.map((_, i) => i);
+    const step = Math.floor((n - 1) / 6);
+    const idxs = Array.from({ length: 7 }, (_, k) => Math.min(k * step, n - 1));
+    if (idxs[idxs.length - 1] !== n - 1) idxs[idxs.length - 1] = n - 1;
+    return [...new Set(idxs)];
+  })();
 
   return (
     <div className="space-y-6">
       <PageIntro
         title="Tren fisiologis"
-        description="Hubungan Resting HR, HRV, dan hari haid. Titik merah = hari perdarahan."
+        description="Resting HR, HRV, dan hari haid. Titik merah = hari perdarahan."
         action={
           <div className="flex items-center gap-1 p-1 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900">
             {[7, 14, 30].map((days) => (
@@ -60,8 +88,8 @@ export const HistoryAnalyticsView: React.FC<HistoryAnalyticsProps> = ({
                 onClick={() => setRangeDays(days)}
                 className={`px-3 py-1.5 rounded-md text-[13px] font-medium cursor-pointer transition-colors ${
                   rangeDays === days
-                    ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 shadow-xs'
-                    : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
+                    ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900'
+                    : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
                 }`}
               >
                 {days}h
@@ -71,176 +99,320 @@ export const HistoryAnalyticsView: React.FC<HistoryAnalyticsProps> = ({
         }
       />
 
+      {/* ── Resting HR Chart ── */}
       <Card>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-5">
           <div>
-            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">Resting HR vs baseline</h2>
-            <p className="text-[13px] text-stone-500 mt-0.5">Garis putus-putus adalah baseline {user.baselineHR} bpm</p>
+            <h2 className="text-[15px] font-semibold text-stone-900 dark:text-stone-100">
+              Resting HR vs baseline
+            </h2>
+            <p className="text-[13px] text-stone-500 mt-0.5">
+              Garis putus-putus = baseline {user.baselineHR} bpm
+            </p>
           </div>
-          <div className="flex gap-4 text-[12px] font-medium text-stone-600 dark:text-stone-400">
+          <div className="flex gap-4 text-[12px] font-medium text-stone-500 shrink-0">
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" /> Biasa
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0" />
+              Biasa
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#9f2d3a]" /> Haid
+              <span className="w-2.5 h-2.5 rounded-full bg-[#9f2d3a] shrink-0" />
+              Haid
             </span>
           </div>
         </div>
 
         {displayLogs.length === 0 ? (
-          <p className="text-sm text-stone-500 py-10 text-center">Belum ada data untuk ditampilkan.</p>
+          <p className="text-sm text-stone-400 py-12 text-center">
+            Belum ada data untuk ditampilkan.
+          </p>
         ) : (
           <div>
-            <div className="relative h-60 w-full px-2">
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
-                <defs>
-                  <linearGradient id="hrGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#78716c" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#78716c" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
+            {/* SVG chart — viewBox has built-in padding so dots never clip */}
+            <svg
+              viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+              className="w-full"
+              style={{ height: 240, display: 'block', overflow: 'visible' }}
+              onMouseLeave={() => setTooltip(null)}
+            >
+              <defs>
+                <linearGradient id="hrAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#57534e" stopOpacity="0.12" />
+                  <stop offset="100%" stopColor="#57534e" stopOpacity="0" />
+                </linearGradient>
+                <clipPath id="chartClip">
+                  <rect x={PAD_X} y={PAD_Y} width={plotW} height={plotH} />
+                </clipPath>
+              </defs>
 
-                {/* Horizontal grid lines */}
-                {[0, 25, 50, 75, 100].map((y) => (
-                  <line
-                    key={y}
-                    x1="0"
-                    y1={y}
-                    x2="100"
-                    y2={y}
-                    stroke="currentColor"
-                    className="text-stone-200 dark:text-stone-800"
-                    strokeWidth="1"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                ))}
-
-                {/* Baseline line */}
-                <line
-                  x1="0"
-                  y1={yBase}
-                  x2="100"
-                  y2={yBase}
-                  stroke="#a8a29e"
-                  strokeDasharray="4 4"
-                  strokeWidth="1.5"
-                  vectorEffect="non-scaling-stroke"
-                />
-
-                {/* Soft gradient fill under curve */}
-                {areaPathD && (
-                  <path d={areaPathD} fill="url(#hrGradient)" />
-                )}
-
-                {/* Smooth curve line */}
-                {linePathD && (
-                  <path
-                    d={linePathD}
-                    fill="none"
-                    stroke="#57534e"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                )}
-              </svg>
-
-              {/* Baseline badge indicator */}
-              <div
-                className="absolute right-2 text-[10px] font-medium text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-stone-800 px-2 py-0.5 rounded border border-stone-200 dark:border-stone-700 -translate-y-1/2 pointer-events-none z-10"
-                style={{ top: `${yBase}%` }}
-              >
-                Baseline {user.baselineHR} bpm
-              </div>
-
-              {/* HTML Overlay for data point circular nodes & tooltips */}
-              <div className="absolute inset-0 pointer-events-none px-2">
-                {points.map((pt) => (
-                  <div
-                    key={pt.log.date}
-                    className="absolute pointer-events-auto group -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
-                  >
-                    <div
-                      className={`w-3.5 h-3.5 rounded-full border-2 border-white dark:border-stone-900 shadow-md transition-all duration-150 group-hover:scale-150 cursor-pointer ${
-                        pt.isPeriod
-                          ? 'bg-[#9f2d3a] ring-2 ring-[#9f2d3a]/30'
-                          : 'bg-emerald-600 ring-2 ring-emerald-600/30'
-                      }`}
+              {/* Grid lines */}
+              {[0, 0.25, 0.5, 0.75, 1].map((t) => {
+                const gy = PAD_Y + t * plotH;
+                const hrVal = Math.round(maxHR - t * (maxHR - minHR));
+                return (
+                  <g key={t}>
+                    <line
+                      x1={PAD_X}
+                      y1={gy}
+                      x2={CHART_W - PAD_X}
+                      y2={gy}
+                      stroke="#e7e5e4"
+                      strokeWidth="1"
                     />
-                    {/* Tooltip */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-30 pointer-events-none">
-                      <div className="bg-stone-900 text-white text-[11px] font-medium py-1.5 px-3 rounded-lg shadow-xl whitespace-nowrap">
-                        <div className="font-semibold text-xs flex items-center gap-1.5">
-                          <span>{pt.log.restingHR} bpm</span>
-                          {pt.isPeriod && <span className="bg-rose-500/30 text-rose-300 text-[10px] px-1.5 py-0.2 rounded font-normal">Haid</span>}
-                        </div>
-                        <div className="text-[10px] text-stone-400 mt-0.5">
-                          {parseLocalDate(pt.log.date).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}
-                        </div>
-                      </div>
-                      <div className="w-2 h-2 bg-stone-900 rotate-45 -mt-1" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                    <text
+                      x={PAD_X - 4}
+                      y={gy + 4}
+                      textAnchor="end"
+                      fontSize="11"
+                      fill="#a8a29e"
+                    >
+                      {hrVal}
+                    </text>
+                  </g>
+                );
+              })}
 
-            {/* X-axis date labels accurately positioned below points */}
-            <div className="relative h-6 mt-4 px-2">
-              {points
-                .filter((_, i, arr) => {
-                  const maxLabels = 7;
-                  const step = Math.max(1, Math.floor((arr.length - 1) / (maxLabels - 1)));
-                  return i % step === 0 || i === arr.length - 1;
-                })
-                .map((pt) => (
-                  <span
-                    key={pt.log.date}
-                    className="absolute text-[11px] text-stone-400 dark:text-stone-500 -translate-x-1/2 whitespace-nowrap font-medium"
-                    style={{ left: `${pt.x}%` }}
+              {/* Baseline dashed line */}
+              {yBase >= PAD_Y && yBase <= PAD_Y + plotH && (
+                <line
+                  x1={PAD_X}
+                  y1={yBase}
+                  x2={CHART_W - PAD_X}
+                  y2={yBase}
+                  stroke="#d6d3d1"
+                  strokeDasharray="5 4"
+                  strokeWidth="1.5"
+                />
+              )}
+
+              {/* Area fill */}
+              {areaPath && (
+                <path
+                  d={areaPath}
+                  fill="url(#hrAreaGrad)"
+                  clipPath="url(#chartClip)"
+                />
+              )}
+
+              {/* Line */}
+              {linePath && (
+                <path
+                  d={linePath}
+                  fill="none"
+                  stroke="#44403c"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+
+              {/* Invisible wide hit areas for hover */}
+              {points.map((pt, idx) => (
+                <rect
+                  key={`hit-${pt.log.date}`}
+                  x={pt.x - plotW / displayLogs.length / 2}
+                  y={PAD_Y}
+                  width={plotW / displayLogs.length}
+                  height={plotH}
+                  fill="transparent"
+                  onMouseEnter={() => setTooltip({ idx })}
+                />
+              ))}
+
+              {/* Data point dots */}
+              {points.map((pt, idx) => {
+                const isHovered = tooltip?.idx === idx;
+                return (
+                  <g key={pt.log.date}>
+                    {/* Outer ring on hover */}
+                    {isHovered && (
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={10}
+                        fill={pt.isPeriod ? 'rgba(159,45,58,0.12)' : 'rgba(5,150,105,0.12)'}
+                      />
+                    )}
+                    {/* White border */}
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={isHovered ? 7 : (pt.isPeriod ? 6 : 5)}
+                      fill="white"
+                    />
+                    {/* Filled dot */}
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={isHovered ? 5 : (pt.isPeriod ? 4.5 : 3.5)}
+                      fill={pt.isPeriod ? '#9f2d3a' : '#059669'}
+                    />
+                  </g>
+                );
+              })}
+
+              {/* Tooltip */}
+              {tooltip !== null && (() => {
+                const pt = points[tooltip.idx];
+                const tipW = 96;
+                const tipH = 44;
+                const tipX = Math.min(Math.max(pt.x - tipW / 2, PAD_X), CHART_W - PAD_X - tipW);
+                const tipY = pt.y - tipH - 12;
+                return (
+                  <g style={{ pointerEvents: 'none' }}>
+                    <rect
+                      x={tipX}
+                      y={tipY}
+                      width={tipW}
+                      height={tipH}
+                      rx="6"
+                      fill="#1c1917"
+                    />
+                    {/* Caret */}
+                    <polygon
+                      points={`${pt.x - 5},${tipY + tipH} ${pt.x + 5},${tipY + tipH} ${pt.x},${tipY + tipH + 6}`}
+                      fill="#1c1917"
+                    />
+                    <text
+                      x={tipX + tipW / 2}
+                      y={tipY + 17}
+                      textAnchor="middle"
+                      fontSize="13"
+                      fontWeight="600"
+                      fill="white"
+                    >
+                      {pt.log.restingHR} bpm
+                    </text>
+                    <text
+                      x={tipX + tipW / 2}
+                      y={tipY + 34}
+                      textAnchor="middle"
+                      fontSize="11"
+                      fill="#a8a29e"
+                    >
+                      {parseLocalDate(pt.log.date).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}
+                      {pt.isPeriod ? ' · Haid' : ''}
+                    </text>
+                  </g>
+                );
+              })()}
+
+              {/* X-axis date labels */}
+              {labelIndices.map((idx) => {
+                const pt = points[idx];
+                return (
+                  <text
+                    key={`label-${pt.log.date}`}
+                    x={pt.x}
+                    y={CHART_H - 2}
+                    textAnchor="middle"
+                    fontSize="11"
+                    fill="#a8a29e"
                   >
-                    {parseLocalDate(pt.log.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
-                  </span>
-                ))}
-            </div>
+                    {parseLocalDate(pt.log.date).toLocaleDateString('id-ID', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
+                  </text>
+                );
+              })}
+            </svg>
           </div>
         )}
       </Card>
 
+      {/* ── HRV Chart ── */}
       <Card>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">HRV harian</h2>
-            <p className="text-[13px] text-stone-500 mt-0.5">Batang merah menandai hari perdarahan haid.</p>
-          </div>
+        <div className="mb-5">
+          <h2 className="text-[15px] font-semibold text-stone-900 dark:text-stone-100">
+            HRV harian
+          </h2>
+          <p className="text-[13px] text-stone-500 mt-0.5">
+            Batang merah = hari perdarahan haid
+          </p>
         </div>
-        <div className="flex items-end gap-1.5 h-44 overflow-x-auto pt-6 pb-2 px-1">
-          {displayLogs.map((log) => {
-            const isPeriod = menstrualLogs.find((m) => m.date === log.date)?.isPeriodDay;
-            const height = Math.max(15, Math.min(100, ((log.hrv - 20) / 60) * 100));
-            return (
-              <div key={log.date} className="flex-1 min-w-[20px] flex flex-col items-center gap-1.5 h-full justify-end group relative">
-                <span className="text-[10px] text-stone-400 group-hover:font-semibold group-hover:text-stone-700 dark:group-hover:text-stone-200 transition-colors">
-                  {log.hrv}
-                </span>
-                <div
-                  title={`${log.date}: HRV ${log.hrv} ms`}
-                  style={{ height: `${height}%` }}
-                  className={`w-full rounded-t-md transition-all duration-150 group-hover:brightness-110 ${
-                    isPeriod ? 'bg-[#9f2d3a] shadow-xs' : 'bg-stone-300 dark:bg-stone-700'
-                  }`}
-                />
-                <span className="text-[10px] text-stone-400 font-medium">
-                  {parseLocalDate(log.date).getDate()}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+
+        {displayLogs.length === 0 ? (
+          <p className="text-sm text-stone-400 py-12 text-center">
+            Belum ada data untuk ditampilkan.
+          </p>
+        ) : (() => {
+          const hrvValues = displayLogs.map((l) => l.hrv);
+          const maxHRV = Math.max(...hrvValues, 1);
+          const minHRV = Math.min(...hrvValues, 0);
+          const hrBarW = CHART_W;
+          const hrBarH = 160;
+          const barPadY = 24;
+          const barPlotH = hrBarH - barPadY - 20; // 20 for date labels
+          const barCount = displayLogs.length;
+          const gapFrac = 0.25; // 25% of slot as gap
+          const slotW = hrBarW / barCount;
+          const barW = slotW * (1 - gapFrac);
+
+          return (
+            <svg
+              viewBox={`0 0 ${hrBarW} ${hrBarH}`}
+              className="w-full"
+              style={{ height: 180, display: 'block' }}
+            >
+              {/* Zero baseline */}
+              <line
+                x1={0}
+                y1={barPadY + barPlotH}
+                x2={hrBarW}
+                y2={barPadY + barPlotH}
+                stroke="#e7e5e4"
+                strokeWidth="1"
+              />
+
+              {displayLogs.map((log, idx) => {
+                const isPeriod = !!menstrualLogs.find((m) => m.date === log.date)?.isPeriodDay;
+                const cx = slotW * idx + slotW / 2;
+                const frac = Math.max(0.05, (log.hrv - minHRV) / (maxHRV - minHRV || 1));
+                const bh = frac * barPlotH;
+                const by = barPadY + barPlotH - bh;
+
+                return (
+                  <g key={log.date}>
+                    {/* Value label */}
+                    <text
+                      x={cx}
+                      y={by - 4}
+                      textAnchor="middle"
+                      fontSize="10"
+                      fill="#a8a29e"
+                    >
+                      {log.hrv}
+                    </text>
+                    {/* Bar */}
+                    <rect
+                      x={cx - barW / 2}
+                      y={by}
+                      width={barW}
+                      height={bh}
+                      rx="3"
+                      fill={isPeriod ? '#9f2d3a' : '#d6d3d1'}
+                    />
+                    {/* Date label */}
+                    <text
+                      x={cx}
+                      y={barPadY + barPlotH + 16}
+                      textAnchor="middle"
+                      fontSize="10"
+                      fill="#a8a29e"
+                    >
+                      {parseLocalDate(log.date).getDate()}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          );
+        })()}
       </Card>
     </div>
   );
 };
-
