@@ -1,69 +1,207 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { UserProfile, MenstrualLog, WearableDataPoint } from '../types/anemia';
+import {
+  loadUserProfile,
+  saveUserProfile,
+  loadMenstrualLogs,
+  saveMenstrualLogs,
+  loadWearableLogs,
+  saveWearableLogs,
+  resetAllData,
+} from '../lib/storage';
+import { calculateRiskScore, calculateCyclePrediction, formatLocalDate } from '../lib/screeningEngine';
+
+import { Navbar } from '../components/Navbar';
+import { HealthDisclaimerModal } from '../components/HealthDisclaimerModal';
+import { OnboardingModal } from '../components/OnboardingModal';
+import { DashboardView } from '../components/DashboardView';
+import { MenstrualTrackerView } from '../components/MenstrualTrackerView';
+import { WearableSyncView } from '../components/WearableSyncView';
+import { HistoryAnalyticsView } from '../components/HistoryAnalyticsView';
+import { HealthEducationView } from '../components/HealthEducationView';
+import { PrivacySettingsView } from '../components/PrivacySettingsView';
+import { AiAssistantModal } from '../components/AiAssistantModal';
 
 export default function Home() {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [menstrualLogs, setMenstrualLogs] = useState<MenstrualLog[]>([]);
+  const [wearableLogs, setWearableLogs] = useState<WearableDataPoint[]>([]);
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
+
+  const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
+  const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
+
+  useEffect(() => {
+    const loadedUser = loadUserProfile();
+    setUser(loadedUser);
+    setMenstrualLogs(loadMenstrualLogs());
+    setWearableLogs(loadWearableLogs());
+
+    if (!loadedUser.disclaimerAccepted) {
+      setIsDisclaimerOpen(true);
+    }
+  }, []);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-[var(--background)] text-stone-500 text-sm">
+        Memuat AnemiaSense…
+      </div>
+    );
+  }
+
+  const todayStr = formatLocalDate(new Date());
+  const riskResult = calculateRiskScore(user, menstrualLogs, wearableLogs, todayStr);
+  const prediction = calculateCyclePrediction(user, menstrualLogs, todayStr);
+  const latestWearable = wearableLogs.find((w) => w.date === todayStr) || wearableLogs[0];
+  const todayLog = menstrualLogs.find((l) => l.date === todayStr);
+
+  const handleUpdateUser = (updatedUser: UserProfile) => {
+    setUser(updatedUser);
+    saveUserProfile(updatedUser);
+  };
+
+  const handleSaveMenstrualLog = (log: MenstrualLog) => {
+    const existingIdx = menstrualLogs.findIndex((l) => l.date === log.date);
+    const updated =
+      existingIdx >= 0
+        ? menstrualLogs.map((l, i) => (i === existingIdx ? log : l))
+        : [log, ...menstrualLogs];
+    setMenstrualLogs(updated);
+    saveMenstrualLogs(updated);
+  };
+
+  const handleUpdateWearableLogs = (logs: WearableDataPoint[]) => {
+    setWearableLogs(logs);
+    saveWearableLogs(logs);
+  };
+
+  const handleResetData = () => {
+    if (confirm('Reset semua data ke sampel default AnemiaSense?')) {
+      const fresh = resetAllData();
+      setUser(fresh.user);
+      setMenstrualLogs(fresh.menstrualLogs);
+      setWearableLogs(fresh.wearableLogs);
+      setActiveTab('dashboard');
+    }
+  };
+
+  const handleAcceptDisclaimer = () => {
+    const updated = { ...user, disclaimerAccepted: true };
+    setUser(updated);
+    saveUserProfile(updated);
+    setIsDisclaimerOpen(false);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <div className="min-h-screen flex flex-col bg-[var(--background)] text-stone-900 dark:text-stone-100 font-sans">
+      <Navbar
+        user={user}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
+        onResetData={handleResetData}
+        onOpenDisclaimer={() => setIsDisclaimerOpen(true)}
+      />
+
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8">
+        {activeTab === 'dashboard' && (
+          <DashboardView
+            user={user}
+            riskResult={riskResult}
+            prediction={prediction}
+            latestWearable={latestWearable}
+            todayLog={todayLog}
+            onOpenLogger={() => setActiveTab('menstrual')}
+            onNavigateTab={setActiveTab}
+            onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
+          />
+        )}
+
+        {activeTab === 'menstrual' && (
+          <MenstrualTrackerView
+            user={user}
+            logs={menstrualLogs}
+            prediction={prediction}
+            onSaveLog={handleSaveMenstrualLog}
+          />
+        )}
+
+        {activeTab === 'wearable' && (
+          <WearableSyncView
+            user={user}
+            wearableLogs={wearableLogs}
+            onUpdateUser={handleUpdateUser}
+            onUpdateWearableLogs={handleUpdateWearableLogs}
+          />
+        )}
+
+        {activeTab === 'history' && (
+          <HistoryAnalyticsView
+            user={user}
+            menstrualLogs={menstrualLogs}
+            wearableLogs={wearableLogs}
+          />
+        )}
+
+        {activeTab === 'education' && (
+          <HealthEducationView user={user} riskResult={riskResult} />
+        )}
+
+        {activeTab === 'privacy' && (
+          <PrivacySettingsView
+            user={user}
+            menstrualLogs={menstrualLogs}
+            wearableLogs={wearableLogs}
+            riskResult={riskResult}
+            onUpdateUser={handleUpdateUser}
+            onResetData={handleResetData}
+          />
+        )}
       </main>
+
+      <footer className="border-t border-stone-200 dark:border-stone-800 py-5 text-[12px] text-stone-500">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <img src="/images.webp" alt="AnemiaSense" className="w-5 h-5 rounded object-cover shrink-0" />
+            <p>AnemiaSense · skrining awal, bukan alat diagnosis.</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button type="button" onClick={() => setIsDisclaimerOpen(true)} className="hover:text-stone-800 cursor-pointer">
+              Penafian medis
+            </button>
+            <button type="button" onClick={() => setActiveTab('privacy')} className="hover:text-stone-800 cursor-pointer">
+              Privasi
+            </button>
+            <button type="button" onClick={() => setActiveTab('education')} className="hover:text-stone-800 cursor-pointer">
+              Edukasi
+            </button>
+          </div>
+        </div>
+      </footer>
+
+      <HealthDisclaimerModal
+        isOpen={isDisclaimerOpen}
+        onAccept={handleAcceptDisclaimer}
+        onClose={() => setIsDisclaimerOpen(false)}
+        isMandatory={!user.disclaimerAccepted}
+      />
+
+      <OnboardingModal
+        isOpen={!user.onboardingCompleted}
+        user={user}
+        onSave={handleUpdateUser}
+      />
+
+      <AiAssistantModal
+        isOpen={isAiAssistantOpen}
+        onClose={() => setIsAiAssistantOpen(false)}
+        user={user}
+        riskResult={riskResult}
+        latestWearable={latestWearable}
+      />
     </div>
   );
 }
