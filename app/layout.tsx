@@ -16,7 +16,10 @@ export const metadata: Metadata = {
   title: "AnemiaSense",
   description: "Skrining awal risiko anemia berdasarkan data wearable dan siklus menstruasi.",
   icons: {
-    icon: "/images.webp",
+    icon: [
+      { url: "/images.webp", type: "image/webp" },
+      { url: "/favicon.ico" },
+    ],
     shortcut: "/images.webp",
     apple: "/images.webp",
   },
@@ -30,6 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <link rel="icon" href="/images.webp" type="image/webp" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/images.webp" />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">{children}</body>
