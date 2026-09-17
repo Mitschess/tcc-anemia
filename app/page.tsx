@@ -13,6 +13,7 @@ import {
 } from '../lib/storage';
 import { calculateRiskScore, calculateCyclePrediction, formatLocalDate } from '../lib/screeningEngine';
 
+import { LandingPage } from '../components/LandingPage';
 import { Navbar } from '../components/Navbar';
 import { HealthDisclaimerModal } from '../components/HealthDisclaimerModal';
 import { OnboardingModal } from '../components/OnboardingModal';
@@ -29,6 +30,8 @@ export default function Home() {
   const [menstrualLogs, setMenstrualLogs] = useState<MenstrualLog[]>([]);
   const [wearableLogs, setWearableLogs] = useState<WearableDataPoint[]>([]);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [showLanding, setShowLanding] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
@@ -39,6 +42,12 @@ export default function Home() {
     setMenstrualLogs(loadMenstrualLogs());
     setWearableLogs(loadWearableLogs());
 
+    // If onboarding already completed, skip landing page
+    if (loadedUser.onboardingCompleted) {
+      setShowLanding(false);
+      setShowOnboarding(false);
+    }
+
     if (!loadedUser.disclaimerAccepted) {
       setIsDisclaimerOpen(true);
     }
@@ -46,9 +55,24 @@ export default function Home() {
 
   if (!user) {
     return (
-      <div className="min-h-screen grid place-items-center bg-[var(--background)] text-stone-500 text-sm">
-        Memuat AnemiaSense…
+      <div className="min-h-screen grid place-items-center bg-[var(--background)]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-rose-500 border-t-transparent animate-spin" />
+          <p className="text-xs text-stone-500 font-medium">Memuat AnemiaSense Mobile…</p>
+        </div>
       </div>
+    );
+  }
+
+  // Show landing page before login/onboarding
+  if (showLanding && !user.onboardingCompleted) {
+    return (
+      <LandingPage
+        onGetStarted={() => {
+          setShowLanding(false);
+          setShowOnboarding(true);
+        }}
+      />
     );
   }
 
@@ -61,6 +85,9 @@ export default function Home() {
   const handleUpdateUser = (updatedUser: UserProfile) => {
     setUser(updatedUser);
     saveUserProfile(updatedUser);
+    if (updatedUser.onboardingCompleted) {
+      setShowOnboarding(false);
+    }
   };
 
   const handleSaveMenstrualLog = (log: MenstrualLog) => {
@@ -96,112 +123,98 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--background)] text-stone-900 dark:text-stone-100 font-sans">
-      <Navbar
-        user={user}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
-        onResetData={handleResetData}
-        onOpenDisclaimer={() => setIsDisclaimerOpen(true)}
-      />
+    <div className="min-h-screen bg-stone-900/95 flex justify-center text-stone-900 dark:text-stone-100 font-sans">
+      {/* MOBILE APPLICATION DEVICE CONTAINER (Max Width Smartphone Frame) */}
+      <div className="w-full max-w-md min-h-screen bg-[var(--background)] relative flex flex-col shadow-2xl border-x border-stone-200/50 dark:border-stone-800/50 pb-20">
+        
+        {/* Mobile Header & Bottom Navigation */}
+        <Navbar
+          user={user}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
+          onResetData={handleResetData}
+          onOpenDisclaimer={() => setIsDisclaimerOpen(true)}
+        />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8">
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            user={user}
-            riskResult={riskResult}
-            prediction={prediction}
-            latestWearable={latestWearable}
-            todayLog={todayLog}
-            onOpenLogger={() => setActiveTab('menstrual')}
-            onNavigateTab={setActiveTab}
-            onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
-          />
-        )}
+        {/* Mobile Main Views Area */}
+        <main className="flex-1 px-4 py-4 overflow-y-auto">
+          {activeTab === 'dashboard' && (
+            <DashboardView
+              user={user}
+              riskResult={riskResult}
+              prediction={prediction}
+              latestWearable={latestWearable}
+              todayLog={todayLog}
+              onOpenLogger={() => setActiveTab('menstrual')}
+              onNavigateTab={setActiveTab}
+              onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
+            />
+          )}
 
-        {activeTab === 'menstrual' && (
-          <MenstrualTrackerView
-            user={user}
-            logs={menstrualLogs}
-            prediction={prediction}
-            onSaveLog={handleSaveMenstrualLog}
-          />
-        )}
+          {activeTab === 'menstrual' && (
+            <MenstrualTrackerView
+              user={user}
+              logs={menstrualLogs}
+              prediction={prediction}
+              onSaveLog={handleSaveMenstrualLog}
+            />
+          )}
 
-        {activeTab === 'wearable' && (
-          <WearableSyncView
-            user={user}
-            wearableLogs={wearableLogs}
-            onUpdateUser={handleUpdateUser}
-            onUpdateWearableLogs={handleUpdateWearableLogs}
-          />
-        )}
+          {activeTab === 'wearable' && (
+            <WearableSyncView
+              user={user}
+              wearableLogs={wearableLogs}
+              onUpdateUser={handleUpdateUser}
+              onUpdateWearableLogs={handleUpdateWearableLogs}
+            />
+          )}
 
-        {activeTab === 'history' && (
-          <HistoryAnalyticsView
-            user={user}
-            menstrualLogs={menstrualLogs}
-            wearableLogs={wearableLogs}
-          />
-        )}
+          {activeTab === 'history' && (
+            <HistoryAnalyticsView
+              user={user}
+              menstrualLogs={menstrualLogs}
+              wearableLogs={wearableLogs}
+            />
+          )}
 
-        {activeTab === 'education' && (
-          <HealthEducationView user={user} riskResult={riskResult} />
-        )}
+          {activeTab === 'education' && (
+            <HealthEducationView user={user} riskResult={riskResult} />
+          )}
 
-        {activeTab === 'privacy' && (
-          <PrivacySettingsView
-            user={user}
-            menstrualLogs={menstrualLogs}
-            wearableLogs={wearableLogs}
-            riskResult={riskResult}
-            onUpdateUser={handleUpdateUser}
-            onResetData={handleResetData}
-          />
-        )}
-      </main>
+          {activeTab === 'privacy' && (
+            <PrivacySettingsView
+              user={user}
+              menstrualLogs={menstrualLogs}
+              wearableLogs={wearableLogs}
+              riskResult={riskResult}
+              onUpdateUser={handleUpdateUser}
+              onResetData={handleResetData}
+            />
+          )}
+        </main>
 
-      <footer className="border-t border-stone-200 dark:border-stone-800 py-5 text-[12px] text-stone-500">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <img src="/images.webp" alt="AnemiaSense" className="w-5 h-5 rounded object-cover shrink-0" />
-            <p>AnemiaSense · skrining awal, bukan alat diagnosis.</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <button type="button" onClick={() => setIsDisclaimerOpen(true)} className="hover:text-stone-800 cursor-pointer">
-              Penafian medis
-            </button>
-            <button type="button" onClick={() => setActiveTab('privacy')} className="hover:text-stone-800 cursor-pointer">
-              Privasi
-            </button>
-            <button type="button" onClick={() => setActiveTab('education')} className="hover:text-stone-800 cursor-pointer">
-              Edukasi
-            </button>
-          </div>
-        </div>
-      </footer>
+        <HealthDisclaimerModal
+          isOpen={isDisclaimerOpen}
+          onAccept={handleAcceptDisclaimer}
+          onClose={() => setIsDisclaimerOpen(false)}
+          isMandatory={!user.disclaimerAccepted}
+        />
 
-      <HealthDisclaimerModal
-        isOpen={isDisclaimerOpen}
-        onAccept={handleAcceptDisclaimer}
-        onClose={() => setIsDisclaimerOpen(false)}
-        isMandatory={!user.disclaimerAccepted}
-      />
+        <OnboardingModal
+          isOpen={showOnboarding || !user.onboardingCompleted}
+          user={user}
+          onSave={handleUpdateUser}
+        />
 
-      <OnboardingModal
-        isOpen={!user.onboardingCompleted}
-        user={user}
-        onSave={handleUpdateUser}
-      />
-
-      <AiAssistantModal
-        isOpen={isAiAssistantOpen}
-        onClose={() => setIsAiAssistantOpen(false)}
-        user={user}
-        riskResult={riskResult}
-        latestWearable={latestWearable}
-      />
+        <AiAssistantModal
+          isOpen={isAiAssistantOpen}
+          onClose={() => setIsAiAssistantOpen(false)}
+          user={user}
+          riskResult={riskResult}
+          latestWearable={latestWearable}
+        />
+      </div>
     </div>
   );
 }

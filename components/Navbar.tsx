@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { UserProfile } from '../types/anemia';
-import { Activity, Calendar, TrendingUp, BookOpen, ShieldCheck, Watch, MessageCircle, RotateCcw } from 'lucide-react';
+import { Activity, Calendar, TrendingUp, BookOpen, ShieldCheck, Watch, MessageCircle, RotateCcw, Sparkles } from 'lucide-react';
 
 interface NavbarProps {
   user: UserProfile;
@@ -22,87 +22,76 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenDisclaimer,
 }) => {
   const navItems = [
-    { id: 'dashboard', label: 'Ringkasan', icon: Activity },
+    { id: 'dashboard', label: 'Home', icon: Activity },
     { id: 'menstrual', label: 'Siklus', icon: Calendar },
-    { id: 'wearable', label: 'Wearable', icon: Watch },
+    { id: 'wearable', label: 'Sensor', icon: Watch },
     { id: 'history', label: 'Tren', icon: TrendingUp },
     { id: 'education', label: 'Edukasi', icon: BookOpen },
-    { id: 'privacy', label: 'Privasi', icon: ShieldCheck },
+    { id: 'privacy', label: 'Profil', icon: ShieldCheck },
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-stone-200/90 dark:border-stone-800 bg-[var(--surface)]/90 backdrop-blur-md">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-[3.75rem] gap-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab('dashboard')}
-            className="flex items-center gap-2.5 cursor-pointer shrink-0"
-          >
-            <img
-              src="/images.webp"
-              alt="AnemiaSense Logo"
-              className="w-8 h-8 rounded-lg object-cover"
-            />
-            <span className="text-left">
-              <span className="block text-[15px] font-semibold tracking-tight text-stone-900 dark:text-stone-50 leading-none">
-                AnemiaSense
-              </span>
-              <span className="hidden sm:block text-[11px] text-stone-500 mt-0.5">
-                Skrining risiko, bukan diagnosis
-              </span>
-            </span>
-          </button>
-
-          <nav className="hidden lg:flex items-center gap-0.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors cursor-pointer ${
-                    isActive
-                      ? 'bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-50 font-medium'
-                      : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
+    <>
+      {/* MOBILE TOP BAR HEADER */}
+      <header className="sticky top-0 z-40 w-full border-b border-rose-100/80 dark:border-stone-800/80 bg-[var(--surface)]/90 backdrop-blur-xl shadow-xs">
+        <div className="max-w-md mx-auto px-4">
+          <div className="flex items-center justify-between h-14">
+            
+            {/* Left: App Brand & Logo */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('dashboard')}
+              className="flex items-center gap-2 cursor-pointer shrink-0"
+            >
+              <div className="relative">
+                <img
+                  src="/images.webp"
+                  alt="AnemiaSense"
+                  className="w-8 h-8 rounded-full object-cover border-2 border-rose-500 shadow-sm"
+                />
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-stone-900 ${
+                    user.isWearableConnected ? 'bg-emerald-500' : 'bg-amber-500'
                   }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
+                />
+              </div>
+              <div className="text-left">
+                <span className="block text-sm font-bold tracking-tight text-stone-900 dark:text-stone-50 leading-none">
+                  AnemiaSense
+                </span>
+                <span className="text-[10px] text-rose-500 dark:text-rose-400 font-semibold tracking-wide uppercase">
+                  Mobile Care
+                </span>
+              </div>
+            </button>
 
-          <div className="flex items-center gap-2">
-            <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-stone-500">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${user.isWearableConnected ? 'bg-emerald-600' : 'bg-amber-500'}`}
-              />
-              {user.isWearableConnected ? user.wearableDevice : 'Wearable terputus'}
-            </span>
-            <button
-              type="button"
-              onClick={onOpenAiAssistant}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-stone-800 dark:text-stone-100 border border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800 cursor-pointer"
-            >
-              <MessageCircle className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Asisten</span>
-            </button>
-            <button
-              type="button"
-              onClick={onResetData}
-              title="Reset data sampel"
-              className="p-2 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+            {/* Right Quick Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onOpenAiAssistant}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 shadow-xs cursor-pointer active:scale-95 transition-all"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+                <span>AI Consult</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onResetData}
+                title="Reset sample data"
+                className="p-1.5 rounded-full text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
+      </header>
 
-        <div className="flex lg:hidden overflow-x-auto py-2 gap-1 border-t border-stone-100 dark:border-stone-800 scrollbar-none">
+      {/* MOBILE BOTTOM NAVIGATION BAR (FIXED BOTTOM FLO-STYLE) */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-stone-900/95 backdrop-blur-2xl border-t border-rose-100 dark:border-stone-800 shadow-lg px-2 py-1.5">
+        <div className="max-w-md mx-auto grid grid-cols-6 items-center">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -111,29 +100,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-1 rounded-2xl transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-50 font-medium'
-                    : 'text-stone-500'
+                    ? 'text-rose-600 dark:text-rose-400 font-bold scale-105'
+                    : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-300'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
-                {item.label}
+                <div
+                  className={`p-1.5 rounded-xl transition-all ${
+                    isActive ? 'bg-rose-100/80 dark:bg-rose-950/60 shadow-xs' : 'bg-transparent'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
               </button>
             );
           })}
         </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={onOpenDisclaimer}
-        className="w-full text-left border-t border-stone-100 dark:border-stone-800 bg-stone-50/80 dark:bg-stone-900/50 px-4 py-1.5 text-[11px] text-stone-500 hover:text-stone-700 cursor-pointer"
-      >
-        <span className="max-w-6xl mx-auto block">
-          Hasil aplikasi adalah skrining awal risiko anemia — bukan diagnosis medis.
-        </span>
-      </button>
-    </header>
+      </nav>
+    </>
   );
 };

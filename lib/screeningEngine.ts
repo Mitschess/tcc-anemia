@@ -29,6 +29,55 @@ export function calculateRiskScore(
   const factors: ContributingFactor[] = [];
   let score = 0;
 
+  // 0. EVALUATE BASELINE PROFILE FACTORS
+  if (user.anemiaHistory === 'yes') {
+    score += 10;
+    factors.push({
+      id: 'b-anemia-history',
+      type: 'baseline',
+      title: 'Riwayat Anemia Pernah Didiagnosis',
+      description: 'Riwayat klinis anemia sebelumnya meningkatkan probabilitas kekambuhan saat volume perdarahan haid meningkat.',
+      severity: 'warning',
+      impactPoints: 10,
+    });
+  }
+
+  if (user.dietPattern === 'vegetarian' || user.dietPattern === 'vegan' || user.dietPattern === 'low_red_meat') {
+    score += 8;
+    factors.push({
+      id: 'b-diet-iron',
+      type: 'baseline',
+      title: 'Pola Makan / Asupan Zat Besi Heme Rendah',
+      description: 'Pola makan vegetarian/rendah daging merah memiliki penyerapan zat besi non-heme yang lebih rendah.',
+      severity: 'info',
+      impactPoints: 8,
+    });
+  }
+
+  if (user.ironSupplement === 'never' || user.ironSupplement === 'irregular') {
+    score += 5;
+    factors.push({
+      id: 'b-no-supplements',
+      type: 'baseline',
+      title: 'Konsumsi Suplemen Zat Besi Tidak Rutin',
+      description: 'Kurangnya suplementasi Tablet Tambah Darah (TTD) mengurangi percepatan pembentukan sel darah merah baru.',
+      severity: 'info',
+      impactPoints: 5,
+    });
+  }
+
+  if (user.baselineHbLab && user.baselineHbLab < 12.0) {
+    score += 15;
+    factors.push({
+      id: 'b-low-lab-hb',
+      type: 'baseline',
+      title: `Baseline Hemoglobin Lab Rendah (${user.baselineHbLab} g/dL)`,
+      description: 'Kadar Hb baseline dari skrining/tes lab sebelumnya berada di bawah batas standar normal (12.0 g/dL).',
+      severity: 'critical',
+      impactPoints: 15,
+    });
+  }
+
   // 1. EVALUATE MENSTRUAL FACTORS (recent 14 calendar days)
   const windowStart = addDays(selectedDate, -13);
   const recentMenstrualLogs = menstrualLogs.filter(
@@ -37,6 +86,20 @@ export function calculateRiskScore(
 
   const heavyFlowDays = recentMenstrualLogs.filter(l => l.flowIntensity === 'heavy' || l.flowIntensity === 'very_heavy');
   const moderateFlowDays = recentMenstrualLogs.filter(l => l.flowIntensity === 'moderate');
+
+  // Estimate total PBAC pads over recent period
+  const totalPadsInWindow = recentMenstrualLogs.reduce((acc, log) => acc + (log.padCount || (log.flowIntensity === 'heavy' ? 5 : log.flowIntensity === 'moderate' ? 3 : 1)), 0);
+  if (totalPadsInWindow >= 18) {
+    score += 15;
+    factors.push({
+      id: 'm-pbac-high',
+      type: 'menstrual',
+      title: `Estimasi Volume PBAC Tinggi (${totalPadsInWindow} pembalut/siklus)`,
+      description: 'Jumlah penggantian pembalut per hari tergolong tinggi (standar PBAC >100 poin), berpotensi menorrhagia.',
+      severity: 'critical',
+      impactPoints: 15,
+    });
+  }
 
   let currentPeriodLength = 0;
   for (let i = 0; i < 21; i++) {
@@ -231,6 +294,9 @@ export function calculateRiskScore(
     medicalAdviceRequired = false;
   }
 
+  // Nakes alert is triggered ONLY for high risk (finalScore >= 61) and when enabled
+  const nakesAlertTriggered = finalScore >= 61 && user.nakesNotificationEnabled;
+
   // Recommendations according to FR-24
   const recommendations: string[] = [];
   if (finalScore >= 61) {
@@ -266,6 +332,7 @@ export function calculateRiskScore(
     contributingFactors: factors,
     recommendations,
     medicalAdviceRequired,
+    nakesAlertTriggered,
     explanationText,
     lastCalculatedAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
   };

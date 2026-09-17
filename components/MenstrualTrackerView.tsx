@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import { UserProfile, MenstrualLog, FlowIntensity, SymptomType, CyclePrediction } from '../types/anemia';
 import { FLOW_LABELS, SYMPTOM_LABELS, formatLocalDate, parseLocalDate } from '../lib/screeningEngine';
-import { Check } from 'lucide-react';
-
+import { Check, Calendar as CalendarIcon, Droplets, Plus, Minus, HeartPulse, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Card, FieldLabel, Notice, PageIntro, PrimaryButton, inputClass } from './ui';
 
 interface MenstrualTrackerProps {
@@ -28,6 +27,8 @@ export const MenstrualTrackerView: React.FC<MenstrualTrackerProps> = ({
 
   const [isPeriodDay, setIsPeriodDay] = useState<boolean>(existingLog?.isPeriodDay ?? true);
   const [flowIntensity, setFlowIntensity] = useState<FlowIntensity>(existingLog?.flowIntensity ?? 'heavy');
+  const [padCount, setPadCount] = useState<number>(existingLog?.padCount ?? (flowIntensity === 'very_heavy' ? 6 : flowIntensity === 'heavy' ? 4 : 2));
+  const [padFullness, setPadFullness] = useState<'lightly_soaked' | 'moderately_soaked' | 'fully_soaked'>(existingLog?.padFullness ?? 'moderately_soaked');
   const [selectedSymptoms, setSelectedSymptoms] = useState<SymptomType[]>(existingLog?.symptoms ?? []);
   const [notes, setNotes] = useState<string>(existingLog?.notes ?? '');
 
@@ -38,11 +39,15 @@ export const MenstrualTrackerView: React.FC<MenstrualTrackerProps> = ({
     if (log) {
       setIsPeriodDay(log.isPeriodDay);
       setFlowIntensity(log.flowIntensity);
+      setPadCount(log.padCount ?? 3);
+      setPadFullness(log.padFullness ?? 'moderately_soaked');
       setSelectedSymptoms(log.symptoms);
       setNotes(log.notes || '');
     } else {
       setIsPeriodDay(true);
       setFlowIntensity('moderate');
+      setPadCount(3);
+      setPadFullness('moderately_soaked');
       setSelectedSymptoms([]);
       setNotes('');
     }
@@ -61,6 +66,8 @@ export const MenstrualTrackerView: React.FC<MenstrualTrackerProps> = ({
       date: selectedDate,
       isPeriodDay,
       flowIntensity: isPeriodDay ? flowIntensity : 'none',
+      padCount: isPeriodDay ? padCount : 0,
+      padFullness: isPeriodDay ? padFullness : undefined,
       symptoms: selectedSymptoms,
       notes,
     });
@@ -69,217 +76,200 @@ export const MenstrualTrackerView: React.FC<MenstrualTrackerProps> = ({
   };
 
   const flowOptions: Array<{ id: FlowIntensity; label: string; desc: string }> = [
-    { id: 'light', label: 'Ringan', desc: 'Ganti pembalut 1–2× / hari' },
-    { id: 'moderate', label: 'Sedang', desc: 'Ganti pembalut 3–4× / hari' },
-    { id: 'heavy', label: 'Berat', desc: 'Ganti pembalut 5–6× / hari' },
-    { id: 'very_heavy', label: 'Sangat berat', desc: 'Penuh dalam <2 jam atau gumpalan' },
+    { id: 'light', label: 'Ringan', desc: 'Flek / 1–2 pembalut' },
+    { id: 'moderate', label: 'Sedang', desc: '3–4 pembalut' },
+    { id: 'heavy', label: 'Banyak', desc: '5–6 pembalut / gumpalan' },
+    { id: 'very_heavy', label: 'Sangat Banyak', desc: 'Penuh < 2 jam (Tembus)' },
   ];
 
   return (
-    <div className="space-y-6">
-      <PageIntro
-        title="Pencatatan siklus"
-        description={`Catat aliran dan gejala harian. Siklus rata-rata Anda ${user.avgCycleLength} hari, durasi haid ${user.periodDuration} hari.`}
-      />
+    <div className="space-y-4 animate-fadeIn">
+      {/* Header Banner */}
+      <div className="rounded-2xl p-4 bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-md">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-bold text-rose-200">Kalender & Tracker Haid</span>
+            <h2 className="text-lg font-black mt-0.5">Pencatatan Siklus PBAC</h2>
+          </div>
+          <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md grid place-items-center">
+            <Droplets className="w-5 h-5 text-white" />
+          </div>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <Card className="lg:col-span-7">
-          <div className="flex items-center justify-between gap-3 mb-5">
-            <h2 className="text-sm font-semibold">Catatan harian</h2>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => handleDateSelect(e.target.value)}
-              className={`${inputClass} w-auto`}
-            />
+      {/* Date Picker Strip */}
+      <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-3.5 shadow-xs space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
+            <CalendarIcon className="w-3.5 h-3.5 text-rose-600" />
+            Pilih Tanggal Log:
+          </span>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => handleDateSelect(e.target.value)}
+            className="px-2.5 py-1 rounded-xl text-xs font-bold bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-700 focus:outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Log Form Card */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-4 shadow-xs space-y-4">
+          
+          {/* Period Day Switch */}
+          <div>
+            <FieldLabel>Apakah Anda sedang haid pada tanggal ini?</FieldLabel>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setIsPeriodDay(true)}
+                className={`py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+                  isPeriodDay
+                    ? 'bg-gradient-to-r from-rose-600 to-pink-600 text-white border-rose-600 shadow-md shadow-rose-500/20'
+                    : 'bg-stone-50 dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400'
+                }`}
+              >
+                🔴 Ya, Sedang Haid
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPeriodDay(false)}
+                className={`py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+                  !isPeriodDay
+                    ? 'bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 border-stone-900'
+                    : 'bg-stone-50 dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400'
+                }`}
+              >
+                ⚪ Tidak Haid
+              </button>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <FieldLabel>Sedang haid pada tanggal ini?</FieldLabel>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsPeriodDay(true)}
-                  className={`py-2.5 rounded-lg text-sm font-medium cursor-pointer border ${
-                    isPeriodDay
-                      ? 'bg-[#9f2d3a] text-white border-[#9f2d3a]'
-                      : 'border-stone-200 dark:border-stone-700 text-stone-600'
-                  }`}
-                >
-                  Ya
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsPeriodDay(false)}
-                  className={`py-2.5 rounded-lg text-sm font-medium cursor-pointer border ${
-                    !isPeriodDay
-                      ? 'bg-stone-900 text-white border-stone-900 dark:bg-stone-100 dark:text-stone-900'
-                      : 'border-stone-200 dark:border-stone-700 text-stone-600'
-                  }`}
-                >
-                  Tidak
-                </button>
-              </div>
-            </div>
-
-            {isPeriodDay && (
+          {/* PBAC Flow & Pad Count Tracker */}
+          {isPeriodDay && (
+            <div className="space-y-3 p-3.5 rounded-xl border border-rose-100 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/20">
               <div>
-                <FieldLabel>Intensitas aliran</FieldLabel>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <FieldLabel>Intensitas Perdarahan Haid</FieldLabel>
+                <div className="grid grid-cols-2 gap-2 mt-1">
                   {flowOptions.map((opt) => (
                     <button
                       type="button"
                       key={opt.id}
                       onClick={() => setFlowIntensity(opt.id)}
-                      className={`p-3 rounded-xl border text-left cursor-pointer ${
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
                         flowIntensity === opt.id
-                          ? 'border-[#9f2d3a] bg-rose-50/70 dark:bg-rose-950/20'
-                          : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-900'
+                          ? 'border-rose-500 bg-white dark:bg-stone-800 font-bold shadow-xs text-rose-700 dark:text-rose-300'
+                          : 'border-stone-200 dark:border-stone-800 bg-white/60 dark:bg-stone-800/50 text-stone-600 dark:text-stone-400'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{opt.label}</span>
-                        {flowIntensity === opt.id && <Check className="w-4 h-4 text-[#9f2d3a]" />}
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span>{opt.label}</span>
+                        {flowIntensity === opt.id && <Check className="w-3.5 h-3.5 text-rose-600" />}
                       </div>
-                      <span className="text-[12px] text-stone-500 mt-1 block">{opt.desc}</span>
+                      <span className="text-[10px] text-stone-400 block mt-0.5 font-normal">{opt.desc}</span>
                     </button>
                   ))}
                 </div>
               </div>
-            )}
 
-            <div>
-              <FieldLabel>Gejala yang dirasakan</FieldLabel>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {(Object.keys(SYMPTOM_LABELS) as SymptomType[]).map((key) => {
-                  const item = SYMPTOM_LABELS[key];
-                  const isSelected = selectedSymptoms.includes(key);
-                  return (
+              {/* PBAC Pad Counter */}
+              <div className="pt-2 border-t border-rose-200/50 dark:border-rose-900/40 grid grid-cols-2 gap-3 items-center">
+                <div>
+                  <FieldLabel>Jumlah Pembalut Diganti</FieldLabel>
+                  <div className="flex items-center gap-2 mt-1">
                     <button
                       type="button"
-                      key={key}
-                      onClick={() => toggleSymptom(key)}
-                      className={`p-2.5 rounded-lg border text-left text-sm cursor-pointer flex items-start gap-2 ${
-                        isSelected
-                          ? 'border-[#9f2d3a] bg-rose-50/70 dark:bg-rose-950/20'
-                          : 'border-stone-200 dark:border-stone-800'
-                      }`}
+                      onClick={() => setPadCount(Math.max(0, padCount - 1))}
+                      className="w-8 h-8 rounded-xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 font-black text-rose-600 flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
                     >
-                      <span
-                        className={`w-4 h-4 rounded border mt-0.5 grid place-items-center shrink-0 ${
-                          isSelected ? 'bg-[#9f2d3a] border-[#9f2d3a] text-white' : 'border-stone-300'
-                        }`}
-                      >
-                        {isSelected && <Check className="w-3 h-3" />}
-                      </span>
-                      <span>
-                        <span className="block font-medium">{item.name}</span>
-                        <span className="block text-[12px] text-stone-500">{item.desc}</span>
-                      </span>
+                      <Minus className="w-4 h-4" />
                     </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <FieldLabel>Catatan (opsional)</FieldLabel>
-              <textarea
-                rows={2}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Misalnya: pusing saat berdiri, kurang tidur…"
-                className={inputClass}
-              />
-            </div>
-
-            {saved && <Notice tone="ok">Catatan {selectedDate} tersimpan.</Notice>}
-
-            <PrimaryButton type="submit" className="w-full">
-              Simpan catatan
-            </PrimaryButton>
-          </form>
-        </Card>
-
-        <div className="lg:col-span-5 space-y-5">
-          <Card>
-            <h2 className="text-sm font-semibold mb-3">Prediksi siklus</h2>
-            <div className="space-y-2.5 text-sm">
-              <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-3.5 flex items-center justify-between">
-                <div>
-                  <p className="text-[12px] text-stone-400">Haid berikutnya</p>
-                  <p className="font-medium mt-0.5">
-                    {parseLocalDate(prediction.nextPeriodStartDate).toLocaleDateString('id-ID', {
-                      day: 'numeric',
-                      month: 'long',
-                    })}
-                  </p>
+                    <span className="text-base font-black text-stone-900 dark:text-stone-100 min-w-[24px] text-center">
+                      {padCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPadCount(padCount + 1)}
+                      className="w-8 h-8 rounded-xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 font-black text-rose-600 flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <span className="text-[12px] text-stone-500">
-                  {prediction.daysUntilNextPeriod === 0 ? 'Hari ini' : `${prediction.daysUntilNextPeriod} hari`}
-                </span>
-              </div>
-              <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-3.5">
-                <p className="text-[12px] text-stone-400">Jendela ovulasi</p>
-                <p className="font-medium mt-0.5">
-                  {parseLocalDate(prediction.ovulationDate).toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'short',
-                  })}
-                </p>
-                <p className="text-[12px] text-stone-500 mt-1">
-                  Subur{' '}
-                  {parseLocalDate(prediction.fertileWindowStart).toLocaleDateString('id-ID', { day: 'numeric' })}–
-                  {parseLocalDate(prediction.fertileWindowEnd).toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'short',
-                  })}
-                </p>
+
+                <div>
+                  <FieldLabel>Tingkat Kebasahan PBAC</FieldLabel>
+                  <select
+                    value={padFullness}
+                    onChange={(e) => setPadFullness(e.target.value as any)}
+                    className="w-full px-2.5 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-xs text-stone-900 dark:text-stone-100 font-medium"
+                  >
+                    <option value="lightly_soaked">Sebagian Kecil (1 pt)</option>
+                    <option value="moderately_soaked">Setengah Basah (5 pts)</option>
+                    <option value="fully_soaked">Penuh / Tembus (20 pts)</option>
+                  </select>
+                </div>
               </div>
             </div>
-          </Card>
+          )}
 
-          <Card>
-            <h2 className="text-sm font-semibold mb-3">Riwayat terbaru</h2>
-            <div className="space-y-2 max-h-[380px] overflow-y-auto">
-              {logs.length === 0 && <p className="text-sm text-stone-500">Belum ada catatan.</p>}
-              {logs
-                .slice()
-                .sort((a, b) => b.date.localeCompare(a.date))
-                .slice(0, 12)
-                .map((log) => (
+          {/* Symptom Multi-Select */}
+          <div>
+            <FieldLabel>Gejala Harian & Indikator Anemia</FieldLabel>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              {(Object.keys(SYMPTOM_LABELS) as SymptomType[]).map((key) => {
+                const item = SYMPTOM_LABELS[key];
+                const isSelected = selectedSymptoms.includes(key);
+                const isAnemiaSpecific = item.severity === 'high' || key === 'fatigue' || key === 'dizziness' || key === 'cold_hands_feet';
+                return (
                   <button
                     type="button"
-                    key={log.id}
-                    onClick={() => handleDateSelect(log.date)}
-                    className={`w-full text-left p-3 rounded-xl border text-sm cursor-pointer ${
-                      selectedDate === log.date
-                        ? 'border-[#9f2d3a] bg-rose-50/50 dark:bg-rose-950/20'
-                        : 'border-stone-200 dark:border-stone-800'
+                    key={key}
+                    onClick={() => toggleSymptom(key)}
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                      isSelected
+                        ? 'border-rose-500 bg-rose-50/80 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold shadow-xs'
+                        : 'border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-800/40 text-stone-600 dark:text-stone-400'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium">
-                        {parseLocalDate(log.date).toLocaleDateString('id-ID', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </span>
-                      <span className="text-[12px] text-stone-500">{FLOW_LABELS[log.flowIntensity]}</span>
+                      <span className="text-xs">{item.name}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-rose-600" />}
                     </div>
-                    {log.symptoms.length > 0 && (
-                      <p className="mt-1 text-[12px] text-stone-500">
-                        {log.symptoms.map((s) => SYMPTOM_LABELS[s]?.name || s).join(' · ')}
-                      </p>
+                    {isAnemiaSpecific && (
+                      <span className="text-[9px] font-semibold text-rose-500 block mt-0.5">Spesifik Anemia</span>
                     )}
                   </button>
-                ))}
+                );
+              })}
             </div>
-          </Card>
+          </div>
+
+          {/* Notes Input */}
+          <div>
+            <FieldLabel>Catatan Tambahan (Opsional)</FieldLabel>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Tuliskan catatan fisik atau mood..."
+              className={inputClass}
+            />
+          </div>
+
+          {/* Submit Button */}
+          <PrimaryButton type="submit" className="w-full py-3 text-xs font-bold uppercase tracking-wider">
+            Simpan Log Haid & Gejala
+          </PrimaryButton>
+
+          {saved && (
+            <div className="p-3 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs font-bold text-center flex items-center justify-center gap-2">
+              <CheckCircle2 className="w-4 h-4" /> Log berhasil disimpan!
+            </div>
+          )}
         </div>
-      </div>
+      </form>
     </div>
   );
 };

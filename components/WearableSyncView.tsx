@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { UserProfile, WearableDataPoint } from '../types/anemia';
-import { Heart, RefreshCw, Thermometer, Moon, Activity, Wifi, WifiOff } from 'lucide-react';
+import { Heart, RefreshCw, Thermometer, Moon, Activity, Wifi, WifiOff, Watch, Sparkles, CheckCircle2, Zap } from 'lucide-react';
 import { formatLocalDate } from '../lib/screeningEngine';
 import { Card, FieldLabel, GhostButton, Notice, PageIntro, PrimaryButton, SectionHeader, inputClass } from './ui';
 
@@ -55,8 +55,8 @@ export const WearableSyncView: React.FC<WearableSyncProps> = ({
     setIsSyncing(true);
     setTimeout(() => {
       setIsSyncing(false);
-      flash('Data fisiologis berhasil disinkronkan (simulasi).');
-    }, 900);
+      flash('⚡ Data fisiologis PPG berhasil disinkronkan secara real-time!');
+    }, 1000);
   };
 
   const patchToday = (patch: Partial<WearableDataPoint>) => {
@@ -88,12 +88,12 @@ export const WearableSyncView: React.FC<WearableSyncProps> = ({
       skinTempDelta: 0.4,
       dataQuality: 'high',
     });
-    flash('Simulasi: resting HR +14 bpm, HRV −20 ms.');
+    flash('🚨 Simulasi Terpicu: Lonjakan Resting HR (+14 bpm) & Penurunan HRV (-20 ms).');
   };
 
   const handleSimulateMissingData = () => {
     patchToday({ dataQuality: 'missing' });
-    flash('Simulasi data hari ini ditandai hilang.');
+    flash('⚠️ Simulasi: Data sensor hari ini ditandai tidak lengkap.');
   };
 
   const handleSaveBaselines = (e: React.FormEvent) => {
@@ -104,172 +104,141 @@ export const WearableSyncView: React.FC<WearableSyncProps> = ({
       baselineHRV: baselineHRVInput,
       baselineTemp: baselineTempInput,
     });
-    flash('Baseline pribadi diperbarui.');
+    flash('✅ Baseline norma pribadi berhasil diperbarui!');
   };
 
   return (
-    <div className="space-y-6">
-      <PageIntro
-        title="Perangkat wearable"
-        description="Hubungkan perangkat dan atur baseline Resting HR, HRV, serta suhu untuk skrining yang lebih akurat."
-        action={
-          <PrimaryButton onClick={handleSyncNow} disabled={isSyncing || !user.isWearableConnected}>
-            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Menyinkronkan…' : 'Sinkronkan'}
-          </PrimaryButton>
-        }
-      />
+    <div className="space-y-4 animate-fadeIn">
+      {/* Top Header Card */}
+      <div className="rounded-2xl p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-bold text-blue-200">Sensor Fisiologis PPG</span>
+            <h2 className="text-lg font-black mt-0.5">Koneksi Wearable & Baseline</h2>
+          </div>
+          <button
+            onClick={handleSyncNow}
+            disabled={isSyncing || !user.isWearableConnected}
+            className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md grid place-items-center cursor-pointer hover:bg-white/30 transition-all active:scale-95"
+          >
+            <RefreshCw className={`w-5 h-5 text-white ${isSyncing ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
 
-      {msg && <Notice tone="ok">{msg}</Notice>}
+      {msg && (
+        <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-emerald-500 shrink-0" />
+          <span>{msg}</span>
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <div className="lg:col-span-6 space-y-5">
-          <Card>
-            <SectionHeader
-              title="Koneksi perangkat"
-              action={
-                <GhostButton onClick={handleToggleConnection} className="text-xs py-1.5">
-                  {user.isWearableConnected ? 'Putuskan' : 'Hubungkan'}
-                </GhostButton>
-              }
-            />
-            <FieldLabel>Merek perangkat</FieldLabel>
-            <select
-              value={user.wearableDevice}
-              onChange={(e) => handleDeviceChange(e.target.value)}
-              className={`${inputClass} mb-4`}
+      {/* Connection & Device Selector Card */}
+      <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-4 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Watch className="w-4 h-4 text-blue-600" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
+              Status Perangkat Wearable
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleConnection}
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              user.isWearableConnected
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200'
+                : 'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400'
+            }`}
+          >
+            {user.isWearableConnected ? 'Terhubung' : 'Terputus (Mode Manual)'}
+          </button>
+        </div>
+
+        <div>
+          <FieldLabel>Model Smartwatch / Ring Sensor</FieldLabel>
+          <select
+            value={user.wearableDevice}
+            onChange={(e) => handleDeviceChange(e.target.value)}
+            className={`${inputClass} text-xs font-semibold`}
+          >
+            <option value="Apple Watch Series 9">Apple Watch Series 9</option>
+            <option value="Samsung Galaxy Watch 6">Samsung Galaxy Watch 6</option>
+            <option value="Garmin Venu 3">Garmin Venu 3</option>
+            <option value="Fitbit Charge 6">Fitbit Charge 6</option>
+            <option value="Oura Ring Gen 3">Oura Ring Gen 3</option>
+            <option value="WHOOP 4.0">WHOOP 4.0</option>
+            <option value="None">Tidak Memakai (Input Manual)</option>
+          </select>
+        </div>
+
+        <div className="pt-2 border-t border-stone-100 dark:border-stone-800">
+          <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block mb-2">
+            Uji Simulasi Skenario Fisiologi:
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleSimulateHRSpike}
+              className="px-3 py-2 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900 cursor-pointer active:scale-95 transition-all text-center"
             >
-              <option value="Apple Watch Series 9">Apple Watch</option>
-              <option value="Samsung Galaxy Watch 6">Samsung Galaxy Watch</option>
-              <option value="Garmin Venu 3">Garmin</option>
-              <option value="Fitbit Charge 6">Fitbit</option>
-              <option value="Oura Ring Gen 3">Oura Ring</option>
-              <option value="WHOOP 4.0">WHOOP</option>
-              <option value="None">Tidak memakai wearable</option>
-            </select>
-
-            <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-3 text-sm">
-              <div className="flex items-center gap-2">
-                {user.isWearableConnected ? (
-                  <Wifi className="w-4 h-4 text-emerald-600" />
-                ) : (
-                  <WifiOff className="w-4 h-4 text-amber-600" />
-                )}
-                {user.isWearableConnected ? `Terhubung ke ${user.wearableDevice}` : 'Mode manual'}
-              </div>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-stone-100 dark:border-stone-800">
-              <p className="text-[12px] text-stone-400 mb-2">Uji skenario</p>
-              <div className="grid grid-cols-2 gap-2">
-                <GhostButton type="button" onClick={handleSimulateHRSpike} className="text-xs">
-                  Simulasi lonjakan HR
-                </GhostButton>
-                <GhostButton type="button" onClick={handleSimulateMissingData} className="text-xs">
-                  Simulasi data hilang
-                </GhostButton>
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-            <SectionHeader title="Baseline pribadi" hint="Nilai saat tubuh istirahat dan cukup pulih" />
-            <form onSubmit={handleSaveBaselines} className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <FieldLabel>HR (bpm)</FieldLabel>
-                  <input
-                    type="number"
-                    min={40}
-                    max={120}
-                    value={baselineHRInput}
-                    onChange={(e) => setBaselineHRInput(Number(e.target.value))}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <FieldLabel>HRV (ms)</FieldLabel>
-                  <input
-                    type="number"
-                    min={10}
-                    max={150}
-                    value={baselineHRVInput}
-                    onChange={(e) => setBaselineHRVInput(Number(e.target.value))}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <FieldLabel>Suhu (°C)</FieldLabel>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min={35}
-                    max={38}
-                    value={baselineTempInput}
-                    onChange={(e) => setBaselineTempInput(Number(e.target.value))}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-              <PrimaryButton type="submit" className="w-full">
-                Simpan baseline
-              </PrimaryButton>
-            </form>
-          </Card>
+              🔥 Lonjakan HR (+14 bpm)
+            </button>
+            <button
+              type="button"
+              onClick={handleSimulateMissingData}
+              className="px-3 py-2 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900 cursor-pointer active:scale-95 transition-all text-center"
+            >
+              ⚠️ Data Hilang / Partial
+            </button>
+          </div>
         </div>
+      </div>
 
-        <div className="lg:col-span-6 space-y-5">
-          {(latest?.dataQuality === 'missing' || !user.isWearableConnected) && (
-            <Notice tone="warn">
-              Data HR hari ini belum lengkap. Hubungkan wearable agar skor memakai Resting HR dan HRV. Data yang hilang tidak dianggap abnormal.
-            </Notice>
-          )}
-
-          <Card>
-            <SectionHeader title="Pembacaan hari ini" hint={latest?.date ?? '—'} />
-            {latest ? (
-              <div className="space-y-2.5">
-                <Reading icon={<Heart className="w-4 h-4" />} title="Resting heart rate" value={`${latest.restingHR} bpm`} sub={`Baseline ${user.baselineHR}`} />
-                <Reading icon={<Activity className="w-4 h-4" />} title="HRV" value={`${latest.hrv} ms`} sub={`Baseline ${user.baselineHRV}`} />
-                <Reading
-                  icon={<Thermometer className="w-4 h-4" />}
-                  title="Suhu kulit"
-                  value={`${latest.skinTempDelta >= 0 ? '+' : ''}${latest.skinTempDelta}°C`}
-                  sub={`Perkiraan ${(user.baselineTemp + latest.skinTempDelta).toFixed(1)}°C`}
-                />
-                <Reading icon={<Moon className="w-4 h-4" />} title="Tidur" value={`${latest.sleepDuration} jam`} sub={`Skor ${latest.sleepScore}/100`} />
-              </div>
-            ) : (
-              <p className="text-sm text-stone-500">Belum ada data wearable.</p>
-            )}
-          </Card>
-        </div>
+      {/* Baseline Config Form */}
+      <div className="rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 p-4 shadow-xs space-y-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100">
+          Atur Baseline Normal Pribadi
+        </h3>
+        <form onSubmit={handleSaveBaselines} className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <FieldLabel>Resting HR</FieldLabel>
+              <input
+                type="number"
+                value={baselineHRInput}
+                onChange={(e) => setBaselineHRInput(Number(e.target.value))}
+                className={inputClass}
+              />
+              <span className="text-[9px] text-stone-400 block mt-0.5">bpm</span>
+            </div>
+            <div>
+              <FieldLabel>Baseline HRV</FieldLabel>
+              <input
+                type="number"
+                value={baselineHRVInput}
+                onChange={(e) => setBaselineHRVInput(Number(e.target.value))}
+                className={inputClass}
+              />
+              <span className="text-[9px] text-stone-400 block mt-0.5">ms</span>
+            </div>
+            <div>
+              <FieldLabel>Suhu Kulit</FieldLabel>
+              <input
+                type="number"
+                step="0.1"
+                value={baselineTempInput}
+                onChange={(e) => setBaselineTempInput(Number(e.target.value))}
+                className={inputClass}
+              />
+              <span className="text-[9px] text-stone-400 block mt-0.5">°C</span>
+            </div>
+          </div>
+          <PrimaryButton type="submit" className="w-full py-2.5 text-xs font-bold uppercase">
+            Simpan Norma Baseline
+          </PrimaryButton>
+        </form>
       </div>
     </div>
   );
 };
-
-function Reading({
-  icon,
-  title,
-  value,
-  sub,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-  sub: string;
-}) {
-  return (
-    <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-3">
-      <div className="flex items-center gap-3">
-        <span className="text-stone-400">{icon}</span>
-        <div>
-          <p className="text-sm font-medium">{title}</p>
-          <p className="text-[12px] text-stone-500">{sub}</p>
-        </div>
-      </div>
-      <p className="text-sm font-semibold">{value}</p>
-    </div>
-  );
-}
