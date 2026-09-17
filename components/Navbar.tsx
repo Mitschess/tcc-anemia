@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { UserProfile } from '../types/anemia';
-import { Activity, Calendar, TrendingUp, BookOpen, ShieldCheck, Watch, MessageCircle, RotateCcw, Sparkles } from 'lucide-react';
+import { Activity, Calendar, TrendingUp, BookOpen, ShieldCheck, Watch, Sparkles } from 'lucide-react';
 
 interface NavbarProps {
   user: UserProfile;
@@ -36,7 +36,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       <header className="sticky top-0 z-40 w-full border-b border-rose-100/80 dark:border-stone-800/80 bg-[var(--surface)]/90 backdrop-blur-xl shadow-xs">
         <div className="max-w-md mx-auto px-4">
           <div className="flex items-center justify-between h-14">
-            
             {/* Left: App Brand & Logo */}
             <button
               type="button"
@@ -65,29 +64,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </button>
 
-            {/* Right Quick Actions */}
+            {/* Right Status Badge */}
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onOpenAiAssistant}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 shadow-xs cursor-pointer active:scale-95 transition-all"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
-                <span>AI Consult</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onResetData}
-                title="Reset sample data"
-                className="p-1.5 rounded-full text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200/60 dark:border-rose-900/50">
+                {user.isWearableConnected ? '⌚ Wearable Active' : 'Manual Mode'}
+              </span>
             </div>
           </div>
         </div>
       </header>
+
+      {/* FLOATING ACTION BUTTON (FAB) UNTUK ASISTEN AI */}
+      <div className="fixed bottom-20 right-4 max-w-md z-40">
+        <button
+          type="button"
+          onClick={onOpenAiAssistant}
+          className="flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-gradient-to-r from-rose-500 via-pink-600 to-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-white/20"
+        >
+          <Sparkles className="w-4 h-4 text-amber-200 animate-pulse" />
+          <span>Tanya AI</span>
+        </button>
+      </div>
 
       {/* MOBILE BOTTOM NAVIGATION BAR (FIXED BOTTOM FLO-STYLE) */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-stone-900/95 backdrop-blur-2xl border-t border-rose-100 dark:border-stone-800 shadow-lg px-2 py-1.5">
